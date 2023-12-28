@@ -1,0 +1,91 @@
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include <fstream>
+#include <string>
+
+using namespace std;
+
+// Функция для расчета значения J
+double calculateJ(double X0, double Xt, double F0, double t, double r, double T, double q, double A, double B, double dt, double dtv) {
+    double L = 1 / (2 * q); //влияние сделки на цену
+    double s = A - B; // Спред между спросом и предложением
+    double k = 1 / q - L;
+    double Vt = F0 + L *dtv; // средняя цена котировки
+    double At = Vt+s/2+dt; // изменившаяся цена
+    double Dt = At - Vt - s / 2; //отклонение текущей цены предложения
+    double at = k / (r * (T - t) + 2)-L/2;
+    double bt = 2 / (r * (T - t) + 2);
+    double gt = -(r * (T - t)) / (2 * k * (r * (T - t) + 2));
+    double J = (F0+s/2)*Xt +L*X0*Xt+at*Xt*Xt+bt*Xt*Dt+gt*Dt*Dt; // Ожидаемая стоимость 
+    return J;
+}
+
+int main() {
+    setlocale(LC_ALL, "Russian");
+    // Задаем значения параметров 
+    int N = 100; // Количество
+    double X0 = 100000; //единиц ценной бумаги 
+    double F0 = 100; //фундаментальное значение ценной бумаги
+    double T = 1.0/365; // период в годах
+    double r = 0.01; // скорость конвергенции, которая измеряет “устойчивость” LOB.
+    double q = 5000; // плотность лимитных ордеров / глубина рынка
+    double rXt = (r * X0) / (r * T + 2); //скорость торговли между сделками
+    double A = 100; // ценя спроса
+    double B = 99; // цена предложение
+    double x0 = X0 / (r * T + 2); // начальная и конечная сделка
+    // Создаем одномерный массив
+    double xn = X0 / (N + 1); // общая сумма покупки в течение [0,t)
+    double Xt = X0 - xn; // оставшийся ордер, который должен быть исполнен в момент времени t
+    double dt = 0.0;
+    double dtv = 0.0;
+    double sum = 0.0;
+    vector<double> array(N-2);
+
+    for (int i = 1; i < (N-1); i++) {
+        double t = i * T / N; // время
+        Xt = Xt - xn;
+        for (int k = 0; k < i; k++) {
+            double dt1 = (X0-Xt) * k * exp(-r * (T/N)*(k-i));
+            double dtv1 = (X0 - Xt);
+            dtv += dtv1;
+            dt += dt1;
+        }
+
+         double J = calculateJ(X0, Xt, F0, t, r, T, q, A, B, dt, dtv);
+        sum += J;
+        array[i] = J;
+        array.push_back(sum);
+    }
+
+    // Вычисляем сумму элементов массива
+    double totalSum = 0.0;
+    for (double value : array) {
+        totalSum += value;
+    }
+
+    // Выводим сумму элементов массива
+    cout << "Сумма элементов массива: " << totalSum << endl;
+    cout << "Начальная и конечная сделки : " << x0 << endl;
+    cout << "скорость торговли между сделками : " << Xt << endl;
+
+    // Создаем файл для записи J
+    ofstream outputFile("elementsJ.txt");
+    if (!outputFile) {
+        cerr << "Не удалось открыть файл для записи." << endl;
+        return 1;
+    }
+
+    // Записываем значения элементов массива в файл
+    for (double value : array) {
+        outputFile << value << endl;
+    }
+
+    // Закрываем файл
+    outputFile.close();
+
+    // Выводим сообщение о завершении записи графика
+    cout << "Элементы J записаны в файл elementsJ.txt" << endl;
+
+    return 0;
+}
